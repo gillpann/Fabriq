@@ -1,0 +1,340 @@
+package com.fabriq.fabriq.view;
+
+import com.fabriq.fabriq.model.QualityControl;
+import com.fabriq.fabriq.util.DateUtil;
+import com.fabriq.fabriq.util.Theme;
+import com.fabriq.fabriq.util.UiFactory;
+
+import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.ActionListener;
+import java.time.LocalDate;
+import java.util.List;
+
+public class QualityControlPage extends JPanel {
+
+    private final JTextField kodeField = UiFactory.textField();
+    private final JTextField produkField = UiFactory.textField();
+    private final JTextField tanggalField = UiFactory.textField();
+    private final JTextField diperiksaField = UiFactory.textField();
+    private final JTextField lolosField = UiFactory.textField();
+    private final JTextField catatanField = UiFactory.textField();
+    private final JTextField searchField = UiFactory.textField();
+
+    private final DefaultComboBoxModel<String> batchModel = new DefaultComboBoxModel<>();
+    private final DefaultComboBoxModel<String> inspekturModel = new DefaultComboBoxModel<>();
+    private final JComboBox<String> batchBox = new JComboBox<>(batchModel);
+    private final JComboBox<String> inspekturBox = new JComboBox<>(inspekturModel);
+    private final JComboBox<String> hasilBox = new JComboBox<>(QualityControl.HASILS);
+
+    private final JButton tambahButton = UiFactory.actionButton("Tambah", Theme.BLUE);
+    private final JButton ubahButton = UiFactory.actionButton("Ubah", Theme.GREEN);
+    private final JButton hapusButton = UiFactory.actionButton("Hapus", new Color(200, 60, 60));
+    private final JButton bersihkanButton = UiFactory.actionButton("Bersihkan", new Color(110, 120, 140));
+
+    private final DefaultTableModel tableModel = new DefaultTableModel(
+        new String[]{"No. QC", "Batch", "Produk", "Tanggal",
+                     "Diperiksa", "Lolos", "Inspektur", "Hasil"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            if (columnIndex == 3) {
+                return LocalDate.class;
+            }
+            if (columnIndex == 4 || columnIndex == 5) {
+                return Integer.class;
+            }
+            return String.class;
+        }
+    };
+    private final JTable table = UiFactory.table(tableModel);
+
+    public QualityControlPage() {
+        kodeField.setEditable(false);
+        kodeField.setBackground(Theme.TABLE_HEADER);
+        produkField.setEditable(false);
+        produkField.setBackground(Theme.TABLE_HEADER);
+
+        setLayout(new BorderLayout(0, 20));
+        setBackground(Theme.BACKGROUND);
+        setBorder(BorderFactory.createEmptyBorder(30, 35, 30, 35));
+
+        JPanel center = new JPanel(new BorderLayout(0, 18));
+        center.setOpaque(false);
+        center.add(createFormCard(), BorderLayout.NORTH);
+        center.add(createTableCard(), BorderLayout.CENTER);
+
+        add(UiFactory.pageHeader("Quality Control",
+            "Catat hasil pemeriksaan kualitas tiap batch produksi."), BorderLayout.NORTH);
+        add(center, BorderLayout.CENTER);
+    }
+
+    // ===================== FORM =====================
+    private JPanel createFormCard() {
+        JPanel card = UiFactory.card(new BorderLayout(0, 12));
+
+        JPanel kosong = new JPanel();
+        kosong.setOpaque(false);
+
+        JPanel fields = new JPanel(new GridLayout(2, 5, 12, 10));
+        fields.setOpaque(false);
+        fields.add(UiFactory.formField("No. QC", kodeField));
+        fields.add(UiFactory.formField("Batch", batchBox));
+        fields.add(UiFactory.formField("Produk", produkField));
+        fields.add(UiFactory.formField("Tgl (dd-MM-yyyy)", tanggalField));
+        fields.add(UiFactory.formField("Inspektur", inspekturBox));
+        fields.add(UiFactory.formField("Jumlah Diperiksa", diperiksaField));
+        fields.add(UiFactory.formField("Jumlah Lolos", lolosField));
+        fields.add(UiFactory.formField("Hasil", hasilBox));
+        fields.add(UiFactory.formField("Catatan", catatanField));
+        fields.add(kosong);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        buttons.setOpaque(false);
+        buttons.add(tambahButton);
+        buttons.add(ubahButton);
+        buttons.add(hapusButton);
+        buttons.add(bersihkanButton);
+
+        card.add(UiFactory.label("Form Pemeriksaan", Theme.HEADING, Theme.NAVY), BorderLayout.NORTH);
+        card.add(fields, BorderLayout.CENTER);
+        card.add(buttons, BorderLayout.SOUTH);
+        return card;
+    }
+
+    // ===================== TABEL =====================
+    private JPanel createTableCard() {
+        JPanel card = UiFactory.card(new BorderLayout(0, 12));
+
+        searchField.setPreferredSize(new Dimension(220, 34));
+        JPanel searchBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        searchBox.setOpaque(false);
+        searchBox.add(UiFactory.label("Cari:", Theme.BODY, Theme.TEXT));
+        searchBox.add(searchField);
+
+        JPanel top = new JPanel(new BorderLayout());
+        top.setOpaque(false);
+        top.add(UiFactory.label("Daftar Pemeriksaan", Theme.HEADING, Theme.NAVY), BorderLayout.WEST);
+        top.add(searchBox, BorderLayout.EAST);
+
+        table.setAutoCreateRowSorter(true); // klik header kolom untuk mengurutkan
+        table.getColumnModel().getColumn(0).setPreferredWidth(65);
+        table.getColumnModel().getColumn(1).setPreferredWidth(70);
+        table.getColumnModel().getColumn(2).setPreferredWidth(160);
+        table.getColumnModel().getColumn(3).setCellRenderer(new DateRenderer());
+        table.getColumnModel().getColumn(4).setPreferredWidth(70);
+        table.getColumnModel().getColumn(5).setPreferredWidth(50);
+        table.getColumnModel().getColumn(6).setPreferredWidth(110);
+        table.getColumnModel().getColumn(7).setCellRenderer(new HasilRenderer());
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getViewport().setBackground(Color.WHITE);
+
+        card.add(top, BorderLayout.NORTH);
+        card.add(scrollPane, BorderLayout.CENTER);
+        return card;
+    }
+
+    // Renderer kolom tanggal: tampil dd-MM-yyyy
+    private static class DateRenderer extends DefaultTableCellRenderer {
+        @Override
+        protected void setValue(Object value) {
+            if (value instanceof LocalDate) {
+                setText(DateUtil.format((LocalDate) value));
+            } else {
+                super.setValue(value);
+            }
+        }
+    }
+
+    // Renderer kolom hasil: Lolos hijau, Perlu Perbaikan oranye, Ditolak merah
+    private static class HasilRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(
+                table, value, isSelected, hasFocus, row, column);
+            setFont(getFont().deriveFont(Font.BOLD));
+
+            if (!isSelected) {
+                String hasil = String.valueOf(value);
+                if (QualityControl.HASIL_LOLOS.equals(hasil)) {
+                    setForeground(Theme.GREEN);
+                } else if (QualityControl.HASIL_PERBAIKAN.equals(hasil)) {
+                    setForeground(Theme.ORANGE);
+                } else {
+                    setForeground(new Color(200, 60, 60));
+                }
+            }
+            return c;
+        }
+    }
+
+    // ===== Method untuk dipakai Controller: membaca isian form =====
+    public String getBatch() {
+        return (String) batchBox.getSelectedItem(); // null jika pilihan kosong
+    }
+
+    public String getTanggalText() {
+        return tanggalField.getText();
+    }
+
+    public String getInspektur() {
+        return (String) inspekturBox.getSelectedItem(); // null jika pilihan kosong
+    }
+
+    public String getDiperiksaText() {
+        return diperiksaField.getText();
+    }
+
+    public String getLolosText() {
+        return lolosField.getText();
+    }
+
+    public String getHasil() {
+        return (String) hasilBox.getSelectedItem();
+    }
+
+    public String getCatatan() {
+        return catatanField.getText().trim();
+    }
+
+    public String getSearchText() {
+        return searchField.getText();
+    }
+
+    // No. QC pada baris yang dipilih, atau null kalau tidak ada yang dipilih
+    public String getSelectedKode() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow < 0) {
+            return null;
+        }
+        return (String) tableModel.getValueAt(table.convertRowIndexToModel(viewRow), 0);
+    }
+
+    // ===== Method untuk dipakai Controller: mengubah tampilan =====
+    public void setKode(String kode) {
+        kodeField.setText(kode);
+    }
+
+    public void setProduk(String produk) {
+        produkField.setText(produk);
+    }
+
+    public void setBatchOptions(List<String> batches) {
+        batchModel.removeAllElements();
+        batchModel.addAll(batches);
+    }
+
+    public void setInspekturOptions(List<String> names) {
+        inspekturModel.removeAllElements();
+        inspekturModel.addAll(names);
+    }
+
+    public void fillForm(QualityControl item) {
+        kodeField.setText(item.getKode());
+        selectOrAdd(batchModel, batchBox, item.getBatch());
+        produkField.setText(item.getProduk()); // setelah batch, supaya nama produk tersimpan yang tampil
+        tanggalField.setText(DateUtil.format(item.getTanggal()));
+        selectOrAdd(inspekturModel, inspekturBox, item.getInspektur());
+        diperiksaField.setText(String.valueOf(item.getDiperiksa()));
+        lolosField.setText(String.valueOf(item.getLolos()));
+        hasilBox.setSelectedItem(item.getHasil());
+        catatanField.setText(item.getCatatan());
+    }
+
+    // Kalau nilainya tidak ada di pilihan (misal batch sudah tidak aktif), tambahkan dulu
+    private void selectOrAdd(DefaultComboBoxModel<String> model, JComboBox<String> box, String value) {
+        if (model.getIndexOf(value) < 0) {
+            model.addElement(value);
+        }
+        box.setSelectedItem(value);
+    }
+
+    public void clearForm() {
+        table.clearSelection();
+        tanggalField.setText(DateUtil.format(LocalDate.now()));
+        diperiksaField.setText("");
+        lolosField.setText("");
+        catatanField.setText("");
+        if (batchBox.getItemCount() > 0) {
+            batchBox.setSelectedIndex(0);
+        }
+        if (inspekturBox.getItemCount() > 0) {
+            inspekturBox.setSelectedIndex(0);
+        }
+        hasilBox.setSelectedIndex(0);
+    }
+
+    public void setTableData(List<QualityControl> items) {
+        tableModel.setRowCount(0);
+        for (QualityControl item : items) {
+            tableModel.addRow(new Object[]{
+                item.getKode(), item.getBatch(), item.getProduk(), item.getTanggal(),
+                item.getDiperiksa(), item.getLolos(), item.getInspektur(), item.getHasil()
+            });
+        }
+    }
+
+    // ===== Method untuk dipakai Controller: pasang listener =====
+    public void addTambahListener(ActionListener listener) {
+        tambahButton.addActionListener(listener);
+    }
+
+    public void addUbahListener(ActionListener listener) {
+        ubahButton.addActionListener(listener);
+    }
+
+    public void addHapusListener(ActionListener listener) {
+        hapusButton.addActionListener(listener);
+    }
+
+    public void addBersihkanListener(ActionListener listener) {
+        bersihkanButton.addActionListener(listener);
+    }
+
+    public void addBatchListener(Runnable onChange) {
+        batchBox.addActionListener(e -> onChange.run());
+    }
+
+    public void addSearchListener(Runnable onChange) {
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { onChange.run(); }
+            @Override public void removeUpdate(DocumentEvent e) { onChange.run(); }
+            @Override public void changedUpdate(DocumentEvent e) { onChange.run(); }
+        });
+    }
+
+    public void addSelectionListener(Runnable onSelect) {
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                onSelect.run();
+            }
+        });
+    }
+
+    // ===== Dialog =====
+    public void showWarning(String message) {
+        JOptionPane.showMessageDialog(this, message, "Validasi", JOptionPane.WARNING_MESSAGE);
+    }
+
+    public void showInfo(String message) {
+        JOptionPane.showMessageDialog(this, message, "Fabriq", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    public boolean confirmDelete(String kode) {
+        int choice = JOptionPane.showConfirmDialog(
+            this, "Hapus data pemeriksaan " + kode + "?",
+            "Konfirmasi Hapus", JOptionPane.YES_NO_OPTION);
+        return choice == JOptionPane.YES_OPTION;
+    }
+}
